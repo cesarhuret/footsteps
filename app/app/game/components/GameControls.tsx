@@ -1,18 +1,15 @@
 "use client";
 
 import React from "react";
-import { useGameState } from "../hooks/useGameState";
+import { useWebSocket } from "../hooks/useWebSocket";
 
 const GameControls: React.FC = () => {
-  const { movePlayer } = useGameState();
+  const { sendKeyPress } = useWebSocket();
 
   // Handle touch controls for mobile devices
-  const handleButtonPress = (dx: number, dy: number) => {
-    movePlayer(dx, dy);
+  const handleButtonPress = (direction: 'up' | 'down' | 'left' | 'right' | 'test') => {
+    sendKeyPress(direction);
   };
-
-  // Movement step size
-  const MOVE_STEP = 50;
 
   return (
     <div className="absolute bottom-4 right-4 md:hidden">
@@ -21,7 +18,7 @@ const GameControls: React.FC = () => {
         <div className="col-start-2">
           <button
             className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center text-white text-2xl"
-            onClick={() => handleButtonPress(0, -MOVE_STEP)}
+            onClick={() => handleButtonPress('up')}
             aria-label="Move Up"
           >
             ↑
@@ -32,7 +29,7 @@ const GameControls: React.FC = () => {
         <div>
           <button
             className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center text-white text-2xl"
-            onClick={() => handleButtonPress(-MOVE_STEP, 0)}
+            onClick={() => handleButtonPress('left')}
             aria-label="Move Left"
           >
             ←
@@ -42,7 +39,7 @@ const GameControls: React.FC = () => {
         <div>
           <button
             className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center text-white text-2xl"
-            onClick={() => handleButtonPress(MOVE_STEP, 0)}
+            onClick={() => handleButtonPress('right')}
             aria-label="Move Right"
           >
             →
@@ -53,12 +50,23 @@ const GameControls: React.FC = () => {
         <div className="col-start-2">
           <button
             className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center text-white text-2xl"
-            onClick={() => handleButtonPress(0, MOVE_STEP)}
+            onClick={() => handleButtonPress('down')}
             aria-label="Move Down"
           >
             ↓
           </button>
         </div>
+      </div>
+      
+      {/* Test constraint button */}
+      <div className="mt-2">
+        <button
+          className="w-full h-12 bg-red-800 rounded-lg flex items-center justify-center text-white"
+          onClick={() => handleButtonPress('test')}
+          aria-label="Test Constraint"
+        >
+          Test Constraint
+        </button>
       </div>
     </div>
   );

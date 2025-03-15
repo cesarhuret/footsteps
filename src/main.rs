@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod p2p;
+
 use footsteps_core::Outputs;
 use footsteps_methods::{FOOTSTEPS_GUEST_ELF, FOOTSTEPS_GUEST_ID};
 use risc0_zkvm::{default_prover, ExecutorEnv};
@@ -20,6 +22,11 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
+// Add WebSocket imports
+use futures_util::{SinkExt, StreamExt};
+use tokio::net::{TcpListener, TcpStream};
+use tokio_tungstenite::{accept_async, tungstenite::protocol::Message};
+use serde_json::{Value, json};
 
 // Define the same KeyInput enum as in the guest code
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,13 +40,8 @@ enum KeyInput {
     TestConstraint,
 }
 
-// Define the same GameMap struct as in the guest code
-#[derive(Debug, Serialize, Deserialize)]
-struct GameMap {
-}
-
 // Current position state shared between Bevy and proof generation thread
-struct GameState {
+pub struct GameState {
     position_x: f32,
     position_y: f32,
     last_verified_x: f32,  // Last position verified by ZK proof
@@ -54,9 +56,186 @@ struct GameState {
     verified_trail: Vec<(f32, f32)>, // Trail verified by ZK proof (excluding final position)
 }
 
-fn main() {
+impl GameState {
+    pub fn new() -> Self {
+        Self {
+            position_x: 0.0,
+            position_y: 0.0,
+            last_verified_x: 0.0,
+            last_verified_y: 0.0,
+            proof_start_x: 0.0,
+            proof_start_y: 0.0,
+            pending_keys: VecDeque::new(),
+            processing: false,
+            next_process_time: Instant::now() + Duration::from_secs(5),
+            proof_status: "Waiting for input".to_string(),
+            last_batch_size: 0,
+            verified_trail: Vec::new(),
+        }
+    }
+}
+
+// Function to handle a WebSocket connection
+async fn handle_connection(
+    ws_stream: TcpStream, 
+    game_state: Arc<Mutex<GameState>>,
+    p2p_sender: tokio::sync::mpsc::Sender<p2p::P2PMessage>,
+    node_name: String,
+) {
+    println!("New WebSocket connection: {}", ws_stream.peer_addr().unwrap());
+    
+    let ws_stream = match accept_async(ws_stream).await {
+        Ok(ws) => ws,
+        Err(e) => {
+            eprintln!("Error accepting WebSocket: {:?}", e);
+            return;
+        }
+    };
+    
+    let (mut ws_sender, mut ws_receiver) = ws_stream.split();
+    
+    // Send initial game state
+    let initial_state = {
+        let state = game_state.lock().unwrap();
+        json!({
+            "type": "state_update",
+            "position": {
+                "x": state.position_x,
+                "y": state.position_y
+            },
+            "proofStatus": state.proof_status,
+            "processing": state.processing,
+            "lastBatchSize": state.last_batch_size,
+            "trail": state.verified_trail,
+            "nodeName": node_name,
+        })
+    };
+    
+    if let Err(e) = ws_sender.send(Message::Text(initial_state.to_string())).await {
+        eprintln!("Error sending initial state: {:?}", e);
+        return;
+    }
+    
+    // Clone game state for the state update task
+    let update_game_state = Arc::clone(&game_state);
+    let update_node_name = node_name.clone();
+    
+    // Spawn a task to periodically send state updates
+    let update_task = tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_millis(100));
+        loop {
+            interval.tick().await;
+            
+            let state_json = {
+                let state = update_game_state.lock().unwrap();
+                json!({
+                    "type": "state_update",
+                    "position": {
+                        "x": state.position_x,
+                        "y": state.position_y
+                    },
+                    "proofStatus": state.proof_status,
+                    "processing": state.processing,
+                    "lastBatchSize": state.last_batch_size,
+                    "trail": state.verified_trail,
+                    "nodeName": update_node_name,
+                })
+            };
+            
+            if let Err(e) = ws_sender.send(Message::Text(state_json.to_string())).await {
+                eprintln!("Error sending state update: {:?}", e);
+                break;
+            }
+        }
+    });
+    
+    // Process incoming messages
+    while let Some(result) = ws_receiver.next().await {
+        match result {
+            Ok(msg) => {
+                if let Message::Text(text) = msg {
+                    println!("Received message: {}", text);
+                    
+                    // Parse the message as JSON
+                    if let Ok(json) = serde_json::from_str::<Value>(&text) {
+                        if let Some(msg_type) = json["type"].as_str() {
+                            match msg_type {
+                                "key_press" => {
+                                    if let Some(key_str) = json["key"].as_str() {
+                                        let key = match key_str {
+                                            "up" => KeyInput::Up,
+                                            "down" => KeyInput::Down,
+                                            "left" => KeyInput::Left,
+                                            "right" => KeyInput::Right,
+                                            "test" => KeyInput::TestConstraint,
+                                            _ => KeyInput::None,
+                                        };
+                                        
+                                        // Add the key to the pending keys queue
+                                        {
+                                            let mut state = game_state.lock().unwrap();
+                                            state.pending_keys.push_back(key);
+                                            
+                                            // Update player position immediately for responsive UI
+                                            let (dx, dy) = match key {
+                                                KeyInput::Up => (0.0, -1.0),
+                                                KeyInput::Down => (0.0, 1.0),
+                                                KeyInput::Left => (-1.0, 0.0),
+                                                KeyInput::Right => (1.0, 0.0),
+                                                KeyInput::TestConstraint => (3.0, 3.0),
+                                                KeyInput::None => (0.0, 0.0),
+                                            };
+                                            
+                                            state.position_x += dx;
+                                            state.position_y += dy;
+                                        }
+                                        
+                                        // Send movement to P2P network
+                                        let p2p_msg = p2p::P2PMessage::Movement {
+                                            player_id: format!("{}-player", node_name),
+                                            position: match key {
+                                                KeyInput::Up => (0.0, -1.0),
+                                                KeyInput::Down => (0.0, 1.0),
+                                                KeyInput::Left => (-1.0, 0.0),
+                                                KeyInput::Right => (1.0, 0.0),
+                                                KeyInput::TestConstraint => (3.0, 3.0),
+                                                KeyInput::None => (0.0, 0.0),
+                                            },
+                                            proof_data: vec![1, 2, 3], // Placeholder for actual proof
+                                        };
+                                        
+                                        if let Err(e) = p2p_sender.send(p2p_msg).await {
+                                            eprintln!("Error sending to p2p: {:?}", e);
+                                        }
+                                    }
+                                },
+                                _ => println!("Unknown message type: {}", msg_type),
+                            }
+                        }
+                    }
+                }
+            },
+            Err(e) => {
+                println!("Error receiving message: {:?}", e);
+                break;
+            }
+        }
+    }
+    
+    // Cancel the update task when the connection is closed
+    update_task.abort();
+    println!("WebSocket connection closed");
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Get node name from command line
+    let node_name = std::env::args().nth(1).unwrap_or_else(|| "node".to_string());
+    let ws_port = std::env::args().nth(2).unwrap_or_else(|| "3001".to_string()).parse::<u16>()?;
+    
+    println!("Starting {} node with WebSocket port {}", node_name, ws_port);
+    
     // Print debug information about the environment
-    println!("Starting RISC Zero Bevy Demo");
     println!("OS: {}", std::env::consts::OS);
     println!("Environment variables:");
     for (key, value) in std::env::vars() {
@@ -66,20 +245,10 @@ fn main() {
     }
     
     // Initialize game state
-    let game_state = Arc::new(Mutex::new(GameState {
-        position_x: 0.0,
-        position_y: 0.0,
-        last_verified_x: 0.0,
-        last_verified_y: 0.0,
-        proof_start_x: 0.0,
-        proof_start_y: 0.0,
-        pending_keys: VecDeque::new(),
-        processing: false,
-        next_process_time: Instant::now() + Duration::from_secs(5),
-        proof_status: "Waiting for input".to_string(),
-        last_batch_size: 0,
-        verified_trail: Vec::new(),
-    }));
+    let game_state = Arc::new(Mutex::new(GameState::new()));
+    
+    // Start the P2P node
+    let p2p_sender = p2p::start_p2p_node(node_name.clone(), Arc::clone(&game_state)).await?;
     
     // Clone game state for the proof generation thread
     let proof_game_state = Arc::clone(&game_state);
@@ -246,4 +415,23 @@ fn main() {
             }
         }
     });
+
+    // Set up the WebSocket server
+    let addr = format!("0.0.0.0:{}", ws_port);
+    let listener = TcpListener::bind(&addr).await?;
+    println!("WebSocket server listening on: {}", addr);
+    println!("Connect your Next.js app to ws://<ip>:{}", ws_port);
+
+    // Accept and handle WebSocket connections
+    while let Ok((stream, _)) = listener.accept().await {
+        let game_state_clone = Arc::clone(&game_state);
+        let p2p_sender_clone = p2p_sender.clone();
+        let node_name_clone = node_name.clone();
+        
+        tokio::spawn(async move {
+            handle_connection(stream, game_state_clone, p2p_sender_clone, node_name_clone).await;
+        });
+    }
+    
+    Ok(())
 }

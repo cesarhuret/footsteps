@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { useGameState } from "../hooks/useGameState";
+import { useWebSocket } from "../hooks/useWebSocket";
 
 // Define types for our game objects
 interface GameObject {
@@ -18,7 +18,6 @@ interface Player extends GameObject {
   targetY: number;
 }
 
-interface Obstacle extends GameObject {}
 
 interface TrailPoint {
   x: number;
@@ -29,10 +28,22 @@ interface TrailPoint {
 
 const GameCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { gameState, movePlayer } = useGameState();
+  const { connected, gameState, sendKeyPress } = useWebSocket();
   const [canvasSize, setCanvasSize] = useState({ width: 750, height: 550 });
   const [playerImage, setPlayerImage] = useState<HTMLImageElement | null>(null);
   const [trail, setTrail] = useState<TrailPoint[]>([]);
+  
+  // Create a player object from the WebSocket gameState
+  const player: Player = {
+    x: gameState.position.x,
+    y: gameState.position.y,
+    targetX: gameState.position.x,
+    targetY: gameState.position.y,
+    width: 40,
+    height: 40,
+    color: "#3B82F6", // Blue
+    speed: 25,
+  };
   
   // Previous position for trail calculation
   const prevPosRef = useRef({ x: 0, y: 0 });
@@ -65,8 +76,8 @@ const GameCanvas: React.FC = () => {
   useEffect(() => {
     // Only add trail points if player has moved significantly
     const distMoved = Math.sqrt(
-      Math.pow(gameState.player.x - prevPosRef.current.x, 2) +
-      Math.pow(gameState.player.y - prevPosRef.current.y, 2)
+      Math.pow(player.x - prevPosRef.current.x, 2) +
+      Math.pow(player.y - prevPosRef.current.y, 2)
     );
     
     if (distMoved > 5) {
@@ -74,8 +85,8 @@ const GameCanvas: React.FC = () => {
       setTrail(prevTrail => [
         ...prevTrail,
         {
-          x: gameState.player.x + gameState.player.width / 2,
-          y: gameState.player.y + gameState.player.height / 2,
+          x: player.x + player.width / 2,
+          y: player.y + player.height / 2,
           age: 0,
           maxAge: 30, // How long trail points last
         }
@@ -83,8 +94,8 @@ const GameCanvas: React.FC = () => {
       
       // Update previous position
       prevPosRef.current = {
-        x: gameState.player.x,
-        y: gameState.player.y
+        x: player.x,
+        y: player.y
       };
     }
     
@@ -94,7 +105,7 @@ const GameCanvas: React.FC = () => {
         .map(point => ({ ...point, age: point.age + 1 }))
         .filter(point => point.age < point.maxAge)
     );
-  }, [gameState.player.x, gameState.player.y]);
+  }, [player.x, player.y]);
 
   // Game rendering loop
   useEffect(() => {
@@ -117,50 +128,52 @@ const GameCanvas: React.FC = () => {
     // Draw trail
     drawTrail(ctx, trail);
 
-    // Draw obstacles
-    gameState.obstacles.forEach((obstacle: Obstacle) => {
-      drawObject(ctx, obstacle);
-    });
-
     // Draw the player
-    drawPlayer(ctx, gameState.player, playerImage);
+    drawPlayer(ctx, player, playerImage);
 
     // Draw game stats
-    drawGameStats(ctx, gameState);
-  }, [gameState, canvasSize, playerImage, trail]);
+    drawGameStats(ctx, { player, connected, proofStatus: gameState.proofStatus });
+    
+    // Draw verified trail from WebSocket if available
+    if (gameState.trail && gameState.trail.length > 0) {
+      drawVerifiedTrail(ctx, gameState.trail);
+    }
+  }, [gameState, canvasSize, playerImage, trail, connected, player]);
 
   // Handle keyboard input
   useEffect(() => {
-    const MOVE_STEP = 50; // Match the step size from GameControls
-    
     const handleKeyDown = (e: KeyboardEvent) => {
       switch (e.key) {
         case "ArrowUp":
         case "w":
         case "W":
-          movePlayer(0, -MOVE_STEP);
+          sendKeyPress("up");
           break;
         case "ArrowDown":
         case "s":
         case "S":
-          movePlayer(0, MOVE_STEP);
+          sendKeyPress("down");
           break;
         case "ArrowLeft":
         case "a":
         case "A":
-          movePlayer(-MOVE_STEP, 0);
+          sendKeyPress("left");
           break;
         case "ArrowRight":
         case "d":
         case "D":
-          movePlayer(MOVE_STEP, 0);
+          sendKeyPress("right");
+          break;
+        case "t":
+        case "T":
+          sendKeyPress("test");
           break;
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [movePlayer]);
+  }, [sendKeyPress]);
 
   return (
     <canvas
@@ -220,6 +233,31 @@ function drawTrail(ctx: CanvasRenderingContext2D, trail: TrailPoint[]) {
   });
 }
 
+// Draw the verified trail from the ZK proof
+function drawVerifiedTrail(ctx: CanvasRenderingContext2D, trail: [number, number][]) {
+  ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+  ctx.lineWidth = 3;
+  
+  if (trail.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(trail[0][0], trail[0][1]);
+    
+    for (let i = 1; i < trail.length; i++) {
+      ctx.lineTo(trail[i][0], trail[i][1]);
+    }
+    
+    ctx.stroke();
+  }
+  
+  // Draw points at each position
+  trail.forEach(([x, y]) => {
+    ctx.fillStyle = 'rgba(0, 255, 0, 0.7)';
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
 function drawObject(ctx: CanvasRenderingContext2D, object: GameObject) {
   ctx.fillStyle = object.color;
   ctx.fillRect(object.x, object.y, object.width, object.height);
@@ -254,52 +292,41 @@ function drawPlayer(
       player.height
     );
   } else {
-    // Fallback to rectangle if image not loaded
-    ctx.fillStyle = player.color;
-    ctx.fillRect(player.x, player.y, player.width, player.height);
-    
-    // Draw player details (face)
-    ctx.fillStyle = "#111827";
-    
-    // Eyes
-    const eyeSize = player.width / 6;
-    const eyeY = player.y + player.height / 3;
-    
-    // Left eye
-    ctx.fillRect(
-      player.x + player.width / 4 - eyeSize / 2,
-      eyeY,
-      eyeSize,
-      eyeSize
-    );
-    
-    // Right eye
-    ctx.fillRect(
-      player.x + (player.width * 3) / 4 - eyeSize / 2,
-      eyeY,
-      eyeSize,
-      eyeSize
-    );
-    
-    // Mouth
-    ctx.fillRect(
-      player.x + player.width / 4,
-      player.y + player.height * 0.6,
-      player.width / 2,
-      player.height / 10
-    );
+    // Fallback to a colored rectangle if image isn't loaded
+    drawObject(ctx, player);
   }
 }
 
 function drawGameStats(
   ctx: CanvasRenderingContext2D,
-  gameState: { player: Player; obstacles: Obstacle[] }
+  gameState: { player: Player, connected: boolean, proofStatus: string }
 ) {
-  ctx.fillStyle = "white";
-  ctx.font = "16px Arial";
-  ctx.fillText(`X: ${Math.round(gameState.player.x)}`, 10, 20);
-  ctx.fillText(`Y: ${Math.round(gameState.player.y)}`, 10, 40);
-  ctx.fillText(`Max: 750 x 550`, 10, 60);
+  ctx.fillStyle = "#FFF";
+  ctx.font = "14px Arial";
+  ctx.textAlign = "left";
+  
+  // Draw position
+  ctx.fillText(
+    `Position: (${Math.round(gameState.player.x)}, ${Math.round(gameState.player.y)})`,
+    10,
+    20
+  );
+  
+  // Draw connection status
+  ctx.fillStyle = gameState.connected ? "#4ADE80" : "#EF4444";
+  ctx.fillText(
+    `Connection: ${gameState.connected ? "Connected" : "Disconnected"}`,
+    10,
+    40
+  );
+  
+  // Draw proof status
+  ctx.fillStyle = "#FFF";
+  ctx.fillText(
+    `Proof Status: ${gameState.proofStatus}`,
+    10,
+    60
+  );
 }
 
 export default GameCanvas; 

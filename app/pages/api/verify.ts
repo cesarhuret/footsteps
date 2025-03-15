@@ -18,10 +18,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             console.log("Extracted userId from verification result:", userId);
 
             // Default options
-            let minimumAge = 18;
-            let excludedCountryList: string[] = ["Iran (Islamic Republic of)", "Iraq", "Korea (Democratic People's Republic of)", "Russian Federation", "Syrian Arab Republic", "Venezuela (Bolivarian Republic of)"];
-            let enableOfac = true;
-            let enabledDisclosures = {
+            const minimumAge = 18;
+            const excludedCountryList: string[] = ["Iran (Islamic Republic of)", "Iraq", "Korea (Democratic People's Republic of)", "Russian Federation", "Syrian Arab Republic", "Venezuela (Bolivarian Republic of)"];
+            const enableOfac = true;
+            const enabledDisclosures = {
                 issuing_state: false,
                 name: false,
                 nationality: true,
