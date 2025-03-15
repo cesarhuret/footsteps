@@ -123,28 +123,62 @@ async fn handle_connection(
     // Spawn a task to periodically send state updates
     let update_task = tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_millis(100));
+        
+        // Keep track of the last sent state to detect changes
+        let mut last_sent_state = {
+            let state = update_game_state.lock().unwrap();
+            json!({
+                "position": {
+                    "x": state.position_x,
+                    "y": state.position_y
+                },
+                "proofStatus": state.proof_status.clone(),
+                "processing": state.processing,
+                "lastBatchSize": state.last_batch_size,
+                "trail": state.verified_trail.clone(),
+                "nodeName": update_node_name.clone(),
+            })
+        };
+        
         loop {
             interval.tick().await;
             
-            let state_json = {
+            // Get current state
+            let current_state = {
                 let state = update_game_state.lock().unwrap();
                 json!({
-                    "type": "state_update",
                     "position": {
                         "x": state.position_x,
                         "y": state.position_y
                     },
-                    "proofStatus": state.proof_status,
+                    "proofStatus": state.proof_status.clone(),
                     "processing": state.processing,
                     "lastBatchSize": state.last_batch_size,
-                    "trail": state.verified_trail,
-                    "nodeName": update_node_name,
+                    "trail": state.verified_trail.clone(),
+                    "nodeName": update_node_name.clone(),
                 })
             };
             
-            if let Err(e) = ws_sender.send(Message::Text(state_json.to_string())).await {
-                eprintln!("Error sending state update: {:?}", e);
-                break;
+            // Check if state has changed
+            if current_state != last_sent_state {
+                // State has changed, send update
+                let state_json = json!({
+                    "type": "state_update",
+                    "position": current_state["position"],
+                    "proofStatus": current_state["proofStatus"],
+                    "processing": current_state["processing"],
+                    "lastBatchSize": current_state["lastBatchSize"],
+                    "trail": current_state["trail"],
+                    "nodeName": current_state["nodeName"],
+                });
+                
+                if let Err(e) = ws_sender.send(Message::Text(state_json.to_string())).await {
+                    eprintln!("Error sending state update: {:?}", e);
+                    break;
+                }
+                
+                // Update last sent state
+                last_sent_state = current_state;
             }
         }
     });
@@ -178,8 +212,8 @@ async fn handle_connection(
                                             
                                             // Update player position immediately for responsive UI
                                             let (dx, dy) = match key {
-                                                KeyInput::Up => (0.0, -1.0),
-                                                KeyInput::Down => (0.0, 1.0),
+                                                KeyInput::Up => (0.0, 1.0),
+                                                KeyInput::Down => (0.0, -1.0),
                                                 KeyInput::Left => (-1.0, 0.0),
                                                 KeyInput::Right => (1.0, 0.0),
                                                 KeyInput::TestConstraint => (3.0, 3.0),
@@ -194,8 +228,8 @@ async fn handle_connection(
                                         let p2p_msg = p2p::P2PMessage::Movement {
                                             player_id: format!("{}-player", node_name),
                                             position: match key {
-                                                KeyInput::Up => (0.0, -1.0),
-                                                KeyInput::Down => (0.0, 1.0),
+                                                KeyInput::Up => (0.0, 1.0),
+                                                KeyInput::Down => (0.0, -1.0),
                                                 KeyInput::Left => (-1.0, 0.0),
                                                 KeyInput::Right => (1.0, 0.0),
                                                 KeyInput::TestConstraint => (3.0, 3.0),

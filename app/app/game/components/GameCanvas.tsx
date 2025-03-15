@@ -235,7 +235,7 @@ function drawGameWorld(
 function drawVerifiedTrail(ctx: CanvasRenderingContext2D, trail: [number, number][], canvasHeight: number) {
   
   trail.forEach((point, index) => {
-    const opacity = (index / (trail.length * 1.5)) + 0.3;
+    const opacity = (index / (trail.length * 1.5)) + 0.6;
     ctx.fillStyle = `rgba(0, 255, 0, ${opacity})`;
     ctx.beginPath();
     ctx.arc(point[0] + 20, canvasHeight - point[1] - 20, 10 * opacity, 0, Math.PI * 2);
