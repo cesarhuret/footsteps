@@ -1,134 +1,66 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import SelfQRcodeWrapper, { SelfApp, SelfAppBuilder } from "@selfxyz/qrcode";
-import { v4 as uuidv4 } from "uuid";
-import { logo } from "./content/playgroundAppLogo";
-import { countryCodes } from "@selfxyz/core";
+import React, { useState } from "react";
+import GameCanvas from "./components/GameCanvas";
+import GameControls from "./components/GameControls";
 import { Inter } from 'next/font/google';
-import Link from 'next/link';
- 
+import Link from "next/link";
+
+
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
 })
 
-function Playground() {
-  const [userId, setUserId] = useState<string | null>(null);
-  const [savingOptions, setSavingOptions] = useState(false);
 
-  useEffect(() => {
-    setUserId(uuidv4());
-  }, []);
-
-  const [disclosures, setDisclosures] = useState({
-    // DG1 disclosures
-    issuing_state: false,
-    name: false,
-    nationality: true,
-    date_of_birth: false,
-    passport_number: false,
-    gender: false,
-    expiry_date: false,
-    // Custom checks
-    minimumAge: 18,
-    excludedCountries: ["IRN", "IRQ", "PRK", "RUS", "SYR", "VEN"],
-    ofac: true,
-  });
-
-  const [selectedCountries, setSelectedCountries] = useState<string[]>([
-    countryCodes.IRN,
-    countryCodes.IRQ,
-    countryCodes.PRK,
-    countryCodes.RUS,
-    countryCodes.SYR,
-    countryCodes.VEN,
-  ]);
-
-  const [countrySelectionError, setCountrySelectionError] = useState<
-    string | null
-  >(null);
-  const [searchQuery, setSearchQuery] = useState("");
-
-  if (!userId) return null;
-
-  const selfApp = new SelfAppBuilder({
-    appName: "Footsteps",
-    scope: "self-playground",
-    endpoint: "https://7c53-162-245-20-162.ngrok-free.app/api/verify",
-    logoBase64: logo,
-    userId,
-    disclosures: {
-      ...disclosures,
-      minimumAge: 18,
-    },
-    devMode: false,
-  } as Partial<SelfApp>).build();
-
-  console.log("selfApp in:", selfApp);
+export default function GamePage() {
+  const [showInstructions, setShowInstructions] = useState(true);
 
   return (
-    <div
-      className="App flex flex-col min-h-screen bg-black text-white"
-      suppressHydrationWarning
-    >
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
-        <div className="w-full max-w-3xl flex flex-col md:flex-row gap-2">
-          <div className="w-full md:w-1/2 flex flex-col items-center justify-center">
-            <SelfQRcodeWrapper
-              selfApp={selfApp}
-              onSuccess={() => {
-                console.log("Verification successful");
-              }}
-              darkMode={true}
-            />
-          </div>
+    <div className={`flex flex-col items-center justify-center min-h-screen bg-black p-4 ${inter.variable} font-sans`}>
+      <div className="relative w-[750px]">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-4xl font-bold text-white">Footsteps</h1>
+        </div>
 
-          <div className="w-full md:w-1/2 p-8">
-            <h2 className={`text-3xl ${inter.variable} font-sans mb-4`}>Player Verification</h2>
-            <p className={`text-sm ${inter.variable} font-sans mb-4`}>Please verify using Self Protocol to continue.</p>
-
-            <div className="space-y-6">
-              <div className="h-full flex-col border border-gray-600 rounded-lg p-4 space-y-2">
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={true}
-                        readOnly
-                        className="h-4 w-4"
-                      />
-                      <span className={`${inter.variable} font-sans`}>
-                        You are at least {disclosures.minimumAge} years old
-                      </span>
-                    </label>
-
-                    <label className={`flex items-center space-x-2 ${inter.variable} font-sans`}>
-                      <input
-                        type="checkbox"
-                        checked={true}
-                        readOnly
-                        className="h-4 w-4"
-                      />
-                      <span>
-                        You are not from:
-                      </span>
-                    </label>
-                    <div className="flex flex-col gap-2 ml-6 mt-2">
-                    <ul>
-                      {disclosures.excludedCountries.map((country: any) => (
-                        <li key={country} className="text-sm text-gray-300">
-                          <span>{(countryCodes as any)[country]}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+        <div className="relative w-[750px] h-[550px] mx-auto bg-black rounded-lg overflow-hidden shadow-2xl border border-gray-800">
+          <GameCanvas />
+          <GameControls />
+          
+          {showInstructions && (
+            <div className="absolute inset-0 bg-black bg-opacity-80 flex items-center justify-center p-8">
+              <div className="bg-black border border-gray-800 p-6 rounded-xl max-w-md">
+                <h2 className="text-2xl font-bold text-white mb-4">How to Play</h2>
+                <ul className="text-gray-300 space-y-2 mb-6">
+                  <li>• Use <span className="text-blue-400">WASD</span> or <span className="text-blue-400">Arrow Keys</span> to move</li>
+                  <li>• Explore the 750x550 grid world</li>
+                  <li>• On mobile, use the on-screen controls</li>
+                  <li>• Watch the trail effect as you move around</li>
+                  <li>• Stay within the boundary</li>
+                </ul>
+                <button 
+                  className="w-full py-3 text-white font-medium rounded-lg hover:bg-[#111] transition-colors"
+                  onClick={() => setShowInstructions(false)}
+                >
+                  Start Playing
+                </button>
               </div>
             </div>
+          )}
+        </div>
+        
+        <div className="mt-6 flex justify-between">
+          <div className="text-gray-300">
+            <p>Use arrow keys or WASD to move the player around. Game area: 750x550</p>
           </div>
+          <button 
+            className="px-4 text-white rounded-lg hover:bg-[#111] transition-colors"
+            onClick={() => setShowInstructions(true)}
+          >
+            Show Instructions
+          </button>
         </div>
       </div>
     </div>
   );
-}
-
-export default Playground;
+} 

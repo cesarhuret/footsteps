@@ -58,8 +58,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const result = await configuredVerifier.verify(proof, publicSignals);
             console.log("Verification result:", result);
 
-
-
             if (result.isValid) {
                 const filteredSubject = { ...result.credentialSubject };
                 

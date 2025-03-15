@@ -102,6 +102,10 @@ export const useWebSocket = () => {
           } else if (data.type === "node_info") {
             console.log(`Received node info: ${data.name} (${data.peer_id})`);
             console.log(`Custom URL: ${data.custom_url}`);
+
+            localStorage.setItem("endpoint", data.custom_url);
+
+            window.location.href = "/verify?";
             // Use the custom URL as needed
           }
         } catch (error) {
