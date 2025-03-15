@@ -157,9 +157,32 @@ impl P2PNode {
             }
         }
 
+        // Remove the periodic node info interval
+        // let mut node_info_interval = tokio::time::interval(Duration::from_secs(10));
+        
+        // Flag to track if we should try sending node info
+        let mut try_node_info = true; // Start with true to send node info once at startup
+        let mut retry_timer = tokio::time::interval(Duration::from_secs(3));
+        
         // Event loop
         loop {
             tokio::select! {
+                // Remove the periodic node info broadcast
+                // _ = node_info_interval.tick() => {
+                //     // Periodically broadcast our node info
+                //     self.broadcast_node_info(&mut swarm);
+                // }
+                _ = retry_timer.tick(), if try_node_info => {
+                    // Try to send node info after startup or new connection
+                    println!("Trying to send node info...");
+                    if self.broadcast_node_info(&mut swarm) {
+                        // If successful, reset the flag
+                        try_node_info = false;
+                        println!("Successfully sent node info");
+                    } else {
+                        println!("Failed to send node info, will retry in 3 seconds");
+                    }
+                }
                 event = swarm.select_next_some() => {
                     match event {
                         SwarmEvent::NewListenAddr { address, .. } => {
@@ -168,27 +191,25 @@ impl P2PNode {
                         SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
                             let addr = endpoint.get_remote_address();
                             println!("Connection established with {} via {}", peer_id, addr);
-
-                            // Send our node info to the newly connected peer
-                            let node_info = P2PMessage::NodeInfo {
-                                node_id: self.peer_id.to_string(),
-                                name: self.node_name.clone(),
-                                custom_url: self.custom_url.clone(),
-                            };
-
-                            // Serialize and publish the node info message
-                            match serde_json::to_vec(&node_info) {
-                                Ok(data) => {
-                                    if let Err(e) = swarm.behaviour_mut().gossipsub.publish(self.topic.clone(), data) {
-                                        eprintln!("Error publishing node info: {:?}", e);
-                                    } else {
-                                        println!("Sent node info to newly connected peer");
-                                    }
-                                }
-                                Err(e) => {
-                                    eprintln!("Error serializing node info: {:?}", e);
-                                }
+                            
+                            // Send connection event to the main thread with more detailed information
+                            let event_data = serde_json::json!({
+                                "peer_id": peer_id.to_string(),
+                                "address": addr.to_string(),
+                                "is_incoming": endpoint.is_listener(),
+                                "timestamp": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs(),
+                            });
+                            
+                            let event_msg = serde_json::to_string(&event_data).unwrap_or_else(|_| 
+                                format!("Connected to peer: {} via {}", peer_id, addr)
+                            );
+                            
+                            if let Err(e) = self.connection_events.send(event_msg).await {
+                                eprintln!("Failed to send connection event: {:?}", e);
                             }
+                            
+                            // Set flag to try sending node info after new connection
+                            try_node_info = true;
                         }
                         SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {
                             if let Some(id) = peer_id {
@@ -326,6 +347,40 @@ impl P2PNode {
                         }
                     }
                 }
+            }
+        }
+    }
+    
+    // Helper method to broadcast node info
+    fn broadcast_node_info(&self, swarm: &mut libp2p::swarm::Swarm<GameBehaviour>) -> bool {
+        let node_info = P2PMessage::NodeInfo {
+            node_id: self.peer_id.to_string(),
+            name: self.node_name.clone(),
+            custom_url: self.custom_url.clone(),
+        };
+        
+        // Serialize and publish the node info message
+        match serde_json::to_vec(&node_info) {
+            Ok(data) => {
+                match swarm.behaviour_mut().gossipsub.publish(self.topic.clone(), data) {
+                    Ok(_) => {
+                        println!("Successfully sent node info to peers");
+                        true
+                    }
+                    Err(e) => {
+                        // This is expected to fail sometimes when there aren't enough peers
+                        if e.to_string().contains("InsufficientPeers") {
+                            println!("Not enough peers to publish node info yet (this is normal during startup)");
+                        } else {
+                            eprintln!("Error publishing node info: {:?}", e);
+                        }
+                        false
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("Error serializing node info: {:?}", e);
+                false
             }
         }
     }
