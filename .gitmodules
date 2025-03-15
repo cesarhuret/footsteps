@@ -1,0 +1,4 @@
+[submodule "risc0"]
+	path = risc0
+	url = https://github.com/risc0/risc0.git
+	branch = release-1.2

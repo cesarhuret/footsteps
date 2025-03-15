@@ -9,7 +9,7 @@ edition = "2021"
 serde = { version = "1.0", default-features = false }
 footsteps-core = { path = "../../core" }
 bevy_ecs = "0.9.1"
-risc0-zkvm = { path = "../../../../risc0/zkvm", default-features = false, features = [
+risc0-zkvm = { path = "../../risc0/risc0/zkvm", default-features = false, features = [
   "std",
 ] }
 

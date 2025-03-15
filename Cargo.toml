@@ -7,7 +7,7 @@ edition = "2021"
 serde = { version = "1.0", default-features = false }
 footsteps-core = { path = "core" }
 footsteps-methods = { path = "methods" }
-risc0-zkvm = { path = "../../risc0/zkvm" }
+risc0-zkvm = { path = "./risc0/risc0/zkvm" }
 termios = "0.3"
 
 [features]
