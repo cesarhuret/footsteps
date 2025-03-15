@@ -36,7 +36,7 @@ export const useWebSocket = () => {
   useEffect(() => {
     const connectWebSocket = () => {
       // Use environment variable with fallback to specific IP
-      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://172.21.137.205:3001';
+      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001';
       const ws = new WebSocket(wsUrl);
 
       console.log('Connecting to WebSocket at:', wsUrl);
@@ -105,7 +105,7 @@ export const useWebSocket = () => {
 
             localStorage.setItem("endpoint", data.custom_url);
 
-            window.location.href = "/verify?";
+            window.location.href = "/verify";
             // Use the custom URL as needed
           }
         } catch (error) {

@@ -6,6 +6,8 @@ import {
 } from '@selfxyz/core';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+
+    console.log(req.body);
     if (req.method === 'POST') {
         try {
             const { proof, publicSignals } = req.body;

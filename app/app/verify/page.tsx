@@ -62,7 +62,7 @@ function Playground() {
   const selfApp = new SelfAppBuilder({
     appName: "Footsteps",
     scope: "self-playground",
-    endpoint: "https://7c53-162-245-20-162.ngrok-free.app/api/verify",
+    endpoint: endpoint + "/api/verify",
     logoBase64: logo,
     userId,
     disclosures: {
@@ -82,6 +82,8 @@ function Playground() {
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
         <div className="w-full max-w-3xl flex flex-col md:flex-row gap-2">
           <div className="w-full md:w-1/2 flex flex-col items-center justify-center">
+          {
+            endpoint ? 
             <SelfQRcodeWrapper
               selfApp={selfApp}
               onSuccess={() => {
@@ -90,6 +92,10 @@ function Playground() {
               }}
               darkMode={true}
             />
+
+            : 
+            <p className={`text-sm ${inter.variable} font-sans mb-4`}>No endpoint found. Please try again.</p>
+          }
           </div>
 
           <div className="w-full md:w-1/2 p-8">
