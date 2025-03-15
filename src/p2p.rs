@@ -1,3 +1,6 @@
+use crate::GameState;
+use footsteps_core::Outputs;
+use footsteps_methods::{FOOTSTEPS_GUEST_ELF, FOOTSTEPS_GUEST_ID};
 use futures::StreamExt;
 use libp2p::{
     core::upgrade,
@@ -6,35 +9,27 @@ use libp2p::{
     mdns::{self, tokio::Behaviour as MdnsBehaviour},
     noise,
     swarm::{NetworkBehaviour, SwarmBuilder, SwarmEvent},
-    tcp,
-    yamux,
-    PeerId,
-    Transport,
-    Multiaddr,
+    tcp, yamux, Multiaddr, PeerId, Transport,
 };
+use risc0_zkvm::Receipt;
 use serde::{Deserialize, Serialize};
-use std::{error::Error, sync::{Arc, Mutex}, time::Duration};
+use std::thread;
+use std::{
+    error::Error,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use tokio::sync::mpsc;
-use crate::GameState;
 
 // Message types for our P2P network
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum P2PMessage {
     // Player movement with proof
-    Movement {
-        player_id: String,
-        position: (f32, f32),
-        proof_data: Vec<u8>,
-    },
+    Proof { player_id: String, receipt: Receipt },
     // Player joined
-    PlayerJoined {
-        player_id: String,
-        name: String,
-    },
+    PlayerJoined { player_id: String, name: String },
     // Player left
-    PlayerLeft {
-        player_id: String,
-    },
+    PlayerLeft { player_id: String },
 }
 
 // Define the network behavior
@@ -117,7 +112,8 @@ impl P2PNode {
             transport,
             GameBehaviour { gossipsub, mdns },
             self.peer_id,
-        ).build();
+        )
+        .build();
 
         // Listen on all interfaces and the specified port
         let listen_addr = format!("/ip4/0.0.0.0/tcp/{}", listen_port);
@@ -128,7 +124,7 @@ impl P2PNode {
         for (peer_host, peer_port) in &self.known_peers {
             let peer_addr = format!("/ip4/{}/tcp/{}", peer_host, peer_port);
             println!("Attempting to connect to peer at {}", peer_addr);
-            
+
             match peer_addr.parse::<Multiaddr>() {
                 Ok(addr) => {
                     if let Err(e) = swarm.dial(addr.clone()) {
@@ -136,7 +132,7 @@ impl P2PNode {
                     } else {
                         println!("Dialing peer at {}", addr);
                     }
-                },
+                }
                 Err(e) => eprintln!("Invalid multiaddr {}: {:?}", peer_addr, e),
             }
         }
@@ -170,26 +166,81 @@ impl P2PNode {
                                     swarm.dial(multiaddr)?;
                                 }
                             }
-                            GameBehaviourEvent::Gossipsub(gossipsub::Event::Message { 
+                            GameBehaviourEvent::Gossipsub(gossipsub::Event::Message {
                                 propagation_source: peer_id,
                                 message_id: _,
                                 message,
                             }) => {
-                                println!("Received message from {}: {:?}", peer_id, message.data);
-                                
+                                println!("Received proof from {}: {:?}", peer_id, message.data);
+
                                 // Try to parse the message
                                 if let Ok(p2p_msg) = serde_json::from_slice::<P2PMessage>(&message.data) {
                                     match &p2p_msg {
-                                        P2PMessage::Movement { player_id, position, proof_data: _ } => {
-                                            println!("Movement from {}: {:?}", player_id, position);
-                                            
+                                        P2PMessage::Proof { player_id, receipt } => {
+                                            println!("Proof from {}: {:?}", player_id, receipt);
+
                                             // Here you would verify the proof and update the game state
                                             // For now, just update the position if it's not from this node
                                             if !player_id.starts_with(&node_name) {
-                                                let mut state = game_state.lock().unwrap();
                                                 // Only update if it's from another player
                                                 // In a real implementation, you'd verify the proof first
-                                                println!("Updating position for remote player: {}", player_id);
+
+                                                println!("Verifying proof...");
+                                                {
+                                                    let mut state = game_state.lock().unwrap();
+                                                    state.proof_status = "Verifying proof...".to_string();
+                                                }
+
+                                                // Verify the proof
+                                                if let Err(e) = receipt.verify(FOOTSTEPS_GUEST_ID) {
+                                                    println!("Error verifying proof: {:?}", e);
+
+                                                    // Mark as no longer processing
+                                                    let mut state = game_state.lock().unwrap();
+                                                    state.processing = false;
+                                                        state.proof_status = "Proof verification failed".to_string();
+
+                                                    continue;
+                                                }
+
+                                                println!("Proof verified successfully!");
+
+                                                // Extract the outputs
+                                                let outputs: Outputs = match receipt.journal.decode() {
+                                                    Ok(outputs) => outputs,
+                                                    Err(e) => {
+                                                        println!("Error decoding journal: {:?}", e);
+
+                                                        // Mark as no longer processing
+                                                        let mut state = game_state.lock().unwrap();
+                                                        state.processing = false;
+                                                            state.proof_status = "Journal decoding failed".to_string();
+
+                                                        continue;
+                                                    }
+                                                };
+
+                                                // Update game state
+                                                let mut state: std::sync::MutexGuard<'_, GameState> = game_state.lock().unwrap();
+
+                                                // Get the trail length before moving it
+                                                let trail_len = outputs.trail_positions.len();
+                                                let trail_summary = format!("{:?}", outputs.trail_positions);
+
+                                                // Update the verified trail - make a deep copy to ensure it's a new object
+                                                state.verified_trail = outputs.trail_positions.clone();
+
+                                                state.processing = false;
+                                                state.proof_status = format!("Proof verified! Trail: {} positions", trail_len);
+
+                                                println!("Batch processed! Trail verified with {} positions: {}",
+                                                        trail_len, trail_summary);
+
+                                                // Force immediate update of the trail
+                                                drop(state); // Release the lock before sleeping
+
+                                                // Small delay to ensure the trail update is processed
+                                                thread::sleep(Duration::from_millis(50));
                                             }
                                         }
                                         P2PMessage::PlayerJoined { player_id, name } => {
@@ -209,7 +260,7 @@ impl P2PNode {
                 Some(msg) = receiver.recv() => {
                     // Received a message to send to the P2P network
                     println!("Sending message: {:?}", msg);
-                    
+
                     // Serialize and publish the message
                     match serde_json::to_vec(&msg) {
                         Ok(data) => {
@@ -236,16 +287,16 @@ pub async fn start_p2p_node(
 ) -> Result<mpsc::Sender<P2PMessage>, Box<dyn Error>> {
     // Create a new P2P node
     let node = P2PNode::new("footsteps-game", known_peers)?;
-    
+
     // Get a sender for sending messages to the P2P network
     let sender = node.sender();
-    
+
     // Start the node in a separate task
     tokio::spawn(async move {
         if let Err(e) = node.start(game_state, node_name, p2p_port).await {
             eprintln!("Error starting P2P node: {:?}", e);
         }
     });
-    
+
     Ok(sender)
-} 
+}
