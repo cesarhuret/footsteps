@@ -10,6 +10,7 @@ use libp2p::{
     yamux,
     PeerId,
     Transport,
+    Multiaddr,
 };
 use serde::{Deserialize, Serialize};
 use std::{error::Error, sync::{Arc, Mutex}, time::Duration};
@@ -49,11 +50,12 @@ pub struct P2PNode {
     pub topic: IdentTopic,
     sender: mpsc::Sender<P2PMessage>,
     receiver: mpsc::Receiver<P2PMessage>,
+    known_peers: Vec<(String, u16)>, // List of known peers (hostname/IP, port)
 }
 
 impl P2PNode {
     // Create a new P2P node
-    pub fn new(topic_name: &str) -> Result<Self, Box<dyn Error>> {
+    pub fn new(topic_name: &str, known_peers: Vec<(String, u16)>) -> Result<Self, Box<dyn Error>> {
         // Create a random keypair for identity
         let id_keys = Keypair::generate_ed25519();
         let peer_id = PeerId::from(id_keys.public());
@@ -70,6 +72,7 @@ impl P2PNode {
             topic,
             sender,
             receiver,
+            known_peers,
         })
     }
 
@@ -83,6 +86,7 @@ impl P2PNode {
         mut self,
         game_state: Arc<Mutex<GameState>>,
         node_name: String,
+        listen_port: u16,
     ) -> Result<(), Box<dyn Error>> {
         // Create a simple TCP transport
         let transport = tcp::tokio::Transport::new(tcp::Config::default())
@@ -115,8 +119,27 @@ impl P2PNode {
             self.peer_id,
         ).build();
 
-        // Listen on all interfaces and a random port
-        swarm.listen_on("/ip4/0.0.0.0/tcp/0".parse()?)?;
+        // Listen on all interfaces and the specified port
+        let listen_addr = format!("/ip4/0.0.0.0/tcp/{}", listen_port);
+        println!("Attempting to listen on {}", listen_addr);
+        swarm.listen_on(listen_addr.parse()?)?;
+
+        // Connect to known peers
+        for (peer_host, peer_port) in &self.known_peers {
+            let peer_addr = format!("/ip4/{}/tcp/{}", peer_host, peer_port);
+            println!("Attempting to connect to peer at {}", peer_addr);
+            
+            match peer_addr.parse::<Multiaddr>() {
+                Ok(addr) => {
+                    if let Err(e) = swarm.dial(addr.clone()) {
+                        eprintln!("Failed to dial {}: {:?}", addr, e);
+                    } else {
+                        println!("Dialing peer at {}", addr);
+                    }
+                },
+                Err(e) => eprintln!("Invalid multiaddr {}: {:?}", peer_addr, e),
+            }
+        }
 
         // Clone for the event loop
         let topic = self.topic.clone();
@@ -129,6 +152,16 @@ impl P2PNode {
                     match event {
                         SwarmEvent::NewListenAddr { address, .. } => {
                             println!("Listening on {}", address);
+                        }
+                        SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
+                            println!("Connection established with {} via {}", peer_id, endpoint.get_remote_address());
+                        }
+                        SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {
+                            if let Some(id) = peer_id {
+                                eprintln!("Failed to connect to peer {}: {:?}", id, error);
+                            } else {
+                                eprintln!("Failed to connect to peer: {:?}", error);
+                            }
                         }
                         SwarmEvent::Behaviour(behaviour) => match behaviour {
                             GameBehaviourEvent::Mdns(mdns::Event::Discovered(list)) => {
@@ -198,16 +231,18 @@ impl P2PNode {
 pub async fn start_p2p_node(
     node_name: String,
     game_state: Arc<Mutex<GameState>>,
+    p2p_port: u16,
+    known_peers: Vec<(String, u16)>,
 ) -> Result<mpsc::Sender<P2PMessage>, Box<dyn Error>> {
     // Create a new P2P node
-    let node = P2PNode::new("footsteps-game")?;
+    let node = P2PNode::new("footsteps-game", known_peers)?;
     
     // Get a sender for sending messages to the P2P network
     let sender = node.sender();
     
     // Start the node in a separate task
     tokio::spawn(async move {
-        if let Err(e) = node.start(game_state, node_name).await {
+        if let Err(e) = node.start(game_state, node_name, p2p_port).await {
             eprintln!("Error starting P2P node: {:?}", e);
         }
     });

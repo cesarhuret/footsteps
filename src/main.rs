@@ -266,8 +266,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get node name from command line
     let node_name = std::env::args().nth(1).unwrap_or_else(|| "node".to_string());
     let ws_port = std::env::args().nth(2).unwrap_or_else(|| "3001".to_string()).parse::<u16>()?;
+    let p2p_port = std::env::args().nth(3).unwrap_or_else(|| "9000".to_string()).parse::<u16>()?;
     
-    println!("Starting {} node with WebSocket port {}", node_name, ws_port);
+    // Parse known peers from command line (format: host1:port1,host2:port2,...)
+    let peers_arg = std::env::args().nth(4).unwrap_or_else(|| String::new());
+    let known_peers: Vec<(String, u16)> = if !peers_arg.is_empty() {
+        peers_arg
+            .split(',')
+            .filter_map(|peer_str| {
+                let parts: Vec<&str> = peer_str.split(':').collect();
+                if parts.len() == 2 {
+                    if let Ok(port) = parts[1].parse::<u16>() {
+                        Some((parts[0].to_string(), port))
+                    } else {
+                        eprintln!("Invalid port in peer specification: {}", peer_str);
+                        None
+                    }
+                } else {
+                    eprintln!("Invalid peer specification: {}", peer_str);
+                    None
+                }
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    
+    println!("Starting {} node with WebSocket port {} and P2P port {}", node_name, ws_port, p2p_port);
+    if !known_peers.is_empty() {
+        println!("Known peers:");
+        for (host, port) in &known_peers {
+            println!("  {}:{}", host, port);
+        }
+    } else {
+        println!("No known peers specified. Only local discovery will be used.");
+    }
     
     // Print debug information about the environment
     println!("OS: {}", std::env::consts::OS);
@@ -282,7 +315,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let game_state = Arc::new(Mutex::new(GameState::new()));
     
     // Start the P2P node
-    let p2p_sender = p2p::start_p2p_node(node_name.clone(), Arc::clone(&game_state)).await?;
+    let p2p_sender = p2p::start_p2p_node(node_name.clone(), Arc::clone(&game_state), p2p_port, known_peers).await?;
     
     // Clone game state for the proof generation thread
     let proof_game_state = Arc::clone(&game_state);
