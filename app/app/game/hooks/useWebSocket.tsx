@@ -99,6 +99,10 @@ export const useWebSocket = () => {
               // Scale the trail coordinates as well
               trail: scaledTrail
             });
+          } else if (data.type === "node_info") {
+            console.log(`Received node info: ${data.name} (${data.peer_id})`);
+            console.log(`Custom URL: ${data.custom_url}`);
+            // Use the custom URL as needed
           }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);

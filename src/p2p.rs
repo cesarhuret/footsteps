@@ -20,6 +20,7 @@ use std::{
     time::Duration,
 };
 use tokio::sync::mpsc;
+use serde_json;
 
 // Message types for our P2P network
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,6 +31,13 @@ pub enum P2PMessage {
     PlayerJoined { player_id: String, name: String },
     // Player left
     PlayerLeft { player_id: String },
+    // Node identification with custom data
+    NodeInfo { 
+        node_id: String, 
+        name: String, 
+        custom_url: String,
+        // Add any other custom fields you want to exchange
+    },
 }
 
 // Define the network behavior
@@ -46,11 +54,20 @@ pub struct P2PNode {
     sender: mpsc::Sender<P2PMessage>,
     receiver: mpsc::Receiver<P2PMessage>,
     known_peers: Vec<(String, u16)>, // List of known peers (hostname/IP, port)
+    connection_events: mpsc::Sender<String>, // Channel for connection events
+    node_name: String,
+    custom_url: String, // Custom URL to share with other nodes
 }
 
 impl P2PNode {
     // Create a new P2P node
-    pub fn new(topic_name: &str, known_peers: Vec<(String, u16)>) -> Result<Self, Box<dyn Error>> {
+    pub fn new(
+        topic_name: &str, 
+        known_peers: Vec<(String, u16)>, 
+        connection_events: mpsc::Sender<String>,
+        node_name: String,
+        custom_url: String,
+    ) -> Result<Self, Box<dyn Error>> {
         // Create a random keypair for identity
         let id_keys = Keypair::generate_ed25519();
         let peer_id = PeerId::from(id_keys.public());
@@ -68,6 +85,9 @@ impl P2PNode {
             sender,
             receiver,
             known_peers,
+            connection_events,
+            node_name,
+            custom_url,
         })
     }
 
@@ -80,7 +100,6 @@ impl P2PNode {
     pub async fn start(
         mut self,
         game_state: Arc<Mutex<GameState>>,
-        node_name: String,
         listen_port: u16,
     ) -> Result<(), Box<dyn Error>> {
         // Create a simple TCP transport
@@ -138,10 +157,6 @@ impl P2PNode {
             }
         }
 
-        // Clone for the event loop
-        let topic = self.topic.clone();
-        let mut receiver = self.receiver;
-
         // Event loop
         loop {
             tokio::select! {
@@ -151,7 +166,29 @@ impl P2PNode {
                             println!("Listening on {}", address);
                         }
                         SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
-                            println!("Connection established with {} via {}", peer_id, endpoint.get_remote_address());
+                            let addr = endpoint.get_remote_address();
+                            println!("Connection established with {} via {}", peer_id, addr);
+
+                            // Send our node info to the newly connected peer
+                            let node_info = P2PMessage::NodeInfo {
+                                node_id: self.peer_id.to_string(),
+                                name: self.node_name.clone(),
+                                custom_url: self.custom_url.clone(),
+                            };
+
+                            // Serialize and publish the node info message
+                            match serde_json::to_vec(&node_info) {
+                                Ok(data) => {
+                                    if let Err(e) = swarm.behaviour_mut().gossipsub.publish(self.topic.clone(), data) {
+                                        eprintln!("Error publishing node info: {:?}", e);
+                                    } else {
+                                        println!("Sent node info to newly connected peer");
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("Error serializing node info: {:?}", e);
+                                }
+                            }
                         }
                         SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {
                             if let Some(id) = peer_id {
@@ -172,7 +209,7 @@ impl P2PNode {
                                 message_id: _,
                                 message,
                             }) => {
-                                println!("Received proof from {}: {:?}", peer_id, message.data);
+                                println!("Received proof from {}", peer_id);
 
                                 // Try to parse the message
                                 if let Ok(p2p_msg) = serde_json::from_slice::<P2PMessage>(&message.data) {
@@ -182,7 +219,7 @@ impl P2PNode {
 
                                             // Here you would verify the proof and update the game state
                                             // For now, just update the position if it's not from this node
-                                            if !player_id.starts_with(&node_name) {
+                                            if !player_id.starts_with(&self.node_name) {
                                                 // Only update if it's from another player
                                                 // In a real implementation, you'd verify the proof first
 
@@ -198,8 +235,7 @@ impl P2PNode {
 
                                                     // Mark as no longer processing
                                                     let mut state = game_state.lock().unwrap();
-                                                    state.processing = false;
-                                                        state.proof_status = "Proof verification failed".to_string();
+                                                    state.proof_status = "Proof verification failed".to_string();
 
                                                     continue;
                                                 }
@@ -214,8 +250,7 @@ impl P2PNode {
 
                                                         // Mark as no longer processing
                                                         let mut state = game_state.lock().unwrap();
-                                                        state.processing = false;
-                                                            state.proof_status = "Journal decoding failed".to_string();
+                                                        state.proof_status = "Journal decoding failed".to_string();
 
                                                         continue;
                                                     }
@@ -230,8 +265,6 @@ impl P2PNode {
 
                                                 // Update the verified trail - make a deep copy to ensure it's a new object
                                                 state.verified_trail = outputs.trail_positions.clone();
-
-                                                state.processing = false;
                                                 state.proof_status = format!("Proof verified! Trail: {} positions", trail_len);
 
                                                 println!("Batch processed! Trail verified with {} positions: {}",
@@ -250,6 +283,25 @@ impl P2PNode {
                                         P2PMessage::PlayerLeft { player_id } => {
                                             println!("Player left: {}", player_id);
                                         }
+                                        P2PMessage::NodeInfo { node_id, name, custom_url } => {
+                                            println!("Received node info from {}: name={}, url={}", node_id, name, custom_url);
+                                            
+                                            // Send the node info to the main thread
+                                            let node_info_data = serde_json::json!({
+                                                "type": "node_info",
+                                                "peer_id": node_id,
+                                                "name": name,
+                                                "custom_url": custom_url,
+                                            });
+                                            
+                                            let node_info_msg = serde_json::to_string(&node_info_data).unwrap_or_else(|_| 
+                                                format!("Node info: {} ({}), URL: {}", name, node_id, custom_url)
+                                            );
+                                            
+                                            if let Err(e) = self.connection_events.send(node_info_msg).await {
+                                                eprintln!("Failed to send node info event: {:?}", e);
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -258,14 +310,14 @@ impl P2PNode {
                         _ => {}
                     }
                 }
-                Some(msg) = receiver.recv() => {
+                Some(msg) = self.receiver.recv() => {
                     // Received a message to send to the P2P network
                     println!("Sending message to P2P network");
 
                     // Serialize and publish the message
                     match serde_json::to_vec(&msg) {
                         Ok(data) => {
-                            if let Err(e) = swarm.behaviour_mut().gossipsub.publish(topic.clone(), data) {
+                            if let Err(e) = swarm.behaviour_mut().gossipsub.publish(self.topic.clone(), data) {
                                 eprintln!("Error publishing message: {:?}", e);
                             }
                         }
@@ -285,19 +337,23 @@ pub async fn start_p2p_node(
     game_state: Arc<Mutex<GameState>>,
     p2p_port: u16,
     known_peers: Vec<(String, u16)>,
-) -> Result<mpsc::Sender<P2PMessage>, Box<dyn Error>> {
+    custom_url: String,
+) -> Result<(mpsc::Sender<P2PMessage>, mpsc::Receiver<String>), Box<dyn Error>> {
+    // Create a channel for connection events
+    let (connection_tx, connection_rx) = mpsc::channel::<String>(100);
+    
     // Create a new P2P node
-    let node = P2PNode::new("footsteps-game", known_peers)?;
+    let node = P2PNode::new("footsteps-game", known_peers, connection_tx, node_name, custom_url)?;
 
     // Get a sender for sending messages to the P2P network
     let sender = node.sender();
 
     // Start the node in a separate task
     tokio::spawn(async move {
-        if let Err(e) = node.start(game_state, node_name, p2p_port).await {
+        if let Err(e) = node.start(game_state, p2p_port).await {
             eprintln!("Error starting P2P node: {:?}", e);
         }
     });
 
-    Ok(sender)
+    Ok((sender, connection_rx))
 }
