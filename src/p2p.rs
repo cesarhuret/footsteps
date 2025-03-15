@@ -94,6 +94,7 @@ impl P2PNode {
         let gossipsub_config = gossipsub::ConfigBuilder::default()
             .heartbeat_interval(Duration::from_secs(10))
             .validation_mode(gossipsub::ValidationMode::Strict)
+            .max_transmit_size(1024 * 1024)
             .build()?;
 
         let mut gossipsub = gossipsub::Behaviour::new(
@@ -259,7 +260,7 @@ impl P2PNode {
                 }
                 Some(msg) = receiver.recv() => {
                     // Received a message to send to the P2P network
-                    println!("Sending message: {:?}", msg);
+                    println!("Sending message to P2P network");
 
                     // Serialize and publish the message
                     match serde_json::to_vec(&msg) {

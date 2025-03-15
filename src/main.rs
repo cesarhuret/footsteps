@@ -16,7 +16,7 @@ mod p2p;
 
 use footsteps_core::Outputs;
 use footsteps_methods::{FOOTSTEPS_GUEST_ELF, FOOTSTEPS_GUEST_ID};
-use risc0_zkvm::{default_prover, ExecutorEnv};
+use risc0_zkvm::{default_prover, ExecutorEnv,  serde::to_vec};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
@@ -26,8 +26,8 @@ use std::time::{Duration, Instant};
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
 use tokio::net::{TcpListener, TcpStream};
-use tokio_tungstenite::{accept_async, tungstenite::protocol::Message};
 use tokio::sync::{mpsc, oneshot};
+use tokio_tungstenite::{accept_async, tungstenite::protocol::Message};
 
 // Define the same KeyInput enum as in the guest code
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -328,10 +328,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create a channel for sending proofs from the thread to the main async context
     let (proof_tx, mut proof_rx) = mpsc::channel::<p2p::P2PMessage>(100);
-    
+
     // Clone p2p_sender for the async task
     let p2p_sender_clone = p2p_sender.clone();
-    
+
     // Clone game state for the proof generation thread
     let proof_game_state = Arc::clone(&game_state);
     let proof_node_name = node_name.clone();
@@ -456,6 +456,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         receipt: receipt,
                     };
 
+
+                    // let serialized = to_vec(&receipt).unwrap();
+                    // println!("Receipt size: {} bytes", serialized.len());
+                    // println!(
+                    //     "Receipt size: {:.2} MB",
+                    //     serialized.len() as f64 / 1_048_576.0
+                    // );
+
                     // Send the proof to the main async context
                     if let Err(e) = proof_tx.blocking_send(p2p_msg) {
                         eprintln!("Error sending proof to main context: {:?}", e);
@@ -464,7 +472,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     });
-    
+
     // Spawn a task to forward proofs to the P2P network
     tokio::spawn(async move {
         while let Some(proof_msg) = proof_rx.recv().await {
