@@ -8,39 +8,28 @@
    - Environments: .env
 
  ✓ Starting...
- ✓ Ready in 1118ms
+ ✓ Ready in 1119ms
  ⚠ Your project has `@next/font` installed as a dependency, please use the built-in `next/font` instead. The `@next/font` package will be removed in Next.js 14. You can migrate by running `npx @next/codemod@latest built-in-next-font .`. Read more: https://nextjs.org/docs/messages/built-in-next-font
  ○ Compiling / ...
- ✓ Compiled / in 1101ms (699 modules)
- GET / 200 in 1289ms
- ✓ Compiled in 94ms (325 modules)
+ ✓ Compiled / in 1379ms (699 modules)
+ GET / 200 in 1600ms
+ ✓ Compiled in 390ms (325 modules)
+ GET / 200 in 203ms
+ ✓ Compiled /favicon.ico in 385ms (390 modules)
+ GET /favicon.ico 200 in 660ms
  ○ Compiling /verify ...
- ✓ Compiled /verify in 1033ms (1295 modules)
+ ✓ Compiled /verify in 1543ms (1296 modules)
 [WebSocket] Initializing websocket module.
- GET /verify 200 in 1311ms
- ✓ Compiled /favicon.ico in 186ms (716 modules)
- GET /favicon.ico 200 in 476ms
- POST / 200 in 66ms
- GET / 200 in 26ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /verify 200 in 1795ms
+ GET /favicon.ico 200 in 219ms
+ GET / 200 in 32ms
  GET /favicon.ico 200 in 206ms
- GET /favicon.ico 200 in 209ms
-[WebSocket] Initializing websocket module.
- GET /verify 200 in 111ms
- GET /favicon.ico 200 in 208ms
- ✓ Compiled /api/verify in 414ms (779 modules)
-
- GET /api/verify 405 in 583ms
-
- GET /api/verify 405 in 3ms
- GET /favicon.ico 200 in 233ms
-
- GET /api/verify 405 in 2ms
- GET /favicon.ico 200 in 205ms
- ✓ Compiled in 1338ms (1619 modules)
- GET /verify 200 in 266ms
- GET /verify 200 in 9ms
- GET /verify 200 in 9ms
- ✓ Compiled in 309ms (1586 modules)
- GET /verify 200 in 75ms
+ ✓ Compiled in 252ms (600 modules)
+ GET / 200 in 21ms
+ ✓ Compiled in 3s (1310 modules)
+ GET / 200 in 50ms
+ ✓ Compiled in 178ms (1310 modules)
+ GET / 200 in 42ms
  ELIFECYCLE  Command failed.
 [?25h

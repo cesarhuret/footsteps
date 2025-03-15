@@ -12,11 +12,11 @@ importers:
         specifier: ^14.2.15
         version: 14.2.15(next@15.2.2(react-dom@19.0.0(react@19.0.0))(react@19.0.0))
       '@selfxyz/core':
-        specifier: ^0.0.7
-        version: 0.0.7(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+        specifier: ^0.0.11
+        version: 0.0.11(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       '@selfxyz/qrcode':
-        specifier: ^0.0.10
-        version: 0.0.10(lottie-react@2.4.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+        specifier: ^0.0.12
+        version: 0.0.12(lottie-react@2.4.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       '@vercel/kv':
         specifier: ^3.0.0
         version: 3.0.0
@@ -413,14 +413,14 @@ packages:
   '@rushstack/eslint-patch@1.11.0':
     resolution: {integrity: sha512-zxnHvoMQVqewTJr/W4pKjF0bMGiKJv1WX7bSrkl46Hg0QjESbzBROWK0Wg4RphzSOS5Jiy7eFimmM3UgMrMZbQ==}
 
-  '@selfxyz/core@0.0.7':
-    resolution: {integrity: sha512-mJwjjSCqI8YrjBr16MuMuNXfqKFQ3tQqDq18qvX8U7SawaIs5qw+Qp1k1NLYL1pF6lKs6UlTmxyWDRM1/+qf9Q==}
+  '@selfxyz/core@0.0.11':
+    resolution: {integrity: sha512-Mns8g7giitB2tOCXpVNJvL4FhiCrDg04KNwkN12AZkCMXixTp8XI4qtVQPLX+5KNprl3o0ENizKB70XBVksh5g==}
     peerDependencies:
       react: ^18.0.0
       react-dom: ^18.0.0
 
-  '@selfxyz/qrcode@0.0.10':
-    resolution: {integrity: sha512-h333++FftiEY9FDxB3iEFHmXWnufqo/xRgYXEBIjcU51MeomtEMqZZ7nDMx32jdvvMl8mCayMIAXIFjMFyEI8g==}
+  '@selfxyz/qrcode@0.0.12':
+    resolution: {integrity: sha512-hL1yV9IeD75YTfThvX+RB7YvLeKu7vXhBJpn59oryaQbgLHwGqkQFOEeZ1fv8JpVaS9rFepZHPBy+2FOCo2LtQ==}
     peerDependencies:
       lottie-react: ^2.4.0
       react: ^18.0.0
@@ -2336,7 +2336,7 @@ snapshots:
 
   '@rushstack/eslint-patch@1.11.0': {}
 
-  '@selfxyz/core@0.0.7(react-dom@19.0.0(react@19.0.0))(react@19.0.0)':
+  '@selfxyz/core@0.0.11(react-dom@19.0.0(react@19.0.0))(react@19.0.0)':
     dependencies:
       '@types/react': 18.3.18
       '@types/react-dom': 18.3.5(@types/react@18.3.18)
@@ -2355,7 +2355,7 @@ snapshots:
       - sass
       - utf-8-validate
 
-  '@selfxyz/qrcode@0.0.10(lottie-react@2.4.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(react-dom@19.0.0(react@19.0.0))(react@19.0.0)':
+  '@selfxyz/qrcode@0.0.12(lottie-react@2.4.1(react-dom@19.0.0(react@19.0.0))(react@19.0.0))(react-dom@19.0.0(react@19.0.0))(react@19.0.0)':
     dependencies:
       '@types/react': 18.3.18
       '@types/react-dom': 18.3.5(@types/react@18.3.18)

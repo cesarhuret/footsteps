@@ -10,8 +10,8 @@
   },
   "dependencies": {
     "@next/font": "^14.2.15",
-    "@selfxyz/core": "^0.0.7",
-    "@selfxyz/qrcode": "^0.0.10",
+    "@selfxyz/core": "^0.0.11",
+    "@selfxyz/qrcode": "^0.0.12",
     "@vercel/kv": "^3.0.0",
     "next": "^15.1.7",
     "react": "^19.0.0",
