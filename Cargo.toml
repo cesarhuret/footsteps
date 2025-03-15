@@ -1,0 +1,16 @@
+[package]
+name = "footsteps"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", default-features = false }
+footsteps-core = { path = "core" }
+footsteps-methods = { path = "methods" }
+risc0-zkvm = { path = "../../risc0/zkvm" }
+termios = "0.3"
+
+[features]
+cuda = ["risc0-zkvm/cuda"]
+default = []
+prove = ["risc0-zkvm/prove"]
