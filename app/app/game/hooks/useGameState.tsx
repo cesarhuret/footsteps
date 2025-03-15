@@ -67,7 +67,9 @@ export const useGameState = () => {
 
   // Move player function - now sets target position
   const movePlayer = useCallback((dx: number, dy: number) => {
+    console.log("Moving player by:", dx, dy);
     setGameState((prevState) => {
+
       // Calculate new target position
       const newTargetX = prevState.player.targetX + dx;
       const newTargetY = prevState.player.targetY + dy;
