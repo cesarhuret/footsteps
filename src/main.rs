@@ -454,6 +454,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let p2p_msg = p2p::P2PMessage::Proof {
                         player_id: format!("{}-player", proof_node_name),
                         receipt: receipt,
+                        ImageID: FOOTSTEPS_GUEST_ID,
                     };
 
 

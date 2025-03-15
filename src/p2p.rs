@@ -25,7 +25,7 @@ use tokio::sync::mpsc;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum P2PMessage {
     // Player movement with proof
-    Proof { player_id: String, receipt: Receipt },
+    Proof { player_id: String, receipt: Receipt, ImageID: [u32; 8] },
     // Player joined
     PlayerJoined { player_id: String, name: String },
     // Player left
@@ -177,8 +177,8 @@ impl P2PNode {
                                 // Try to parse the message
                                 if let Ok(p2p_msg) = serde_json::from_slice::<P2PMessage>(&message.data) {
                                     match &p2p_msg {
-                                        P2PMessage::Proof { player_id, receipt } => {
-                                            println!("Proof from {}: {:?}", player_id, receipt);
+                                        P2PMessage::Proof { player_id, receipt, ImageID } => {
+                                            println!("Proof from {}. ImageID: {:?}", player_id, ImageID);
 
                                             // Here you would verify the proof and update the game state
                                             // For now, just update the position if it's not from this node
@@ -193,7 +193,7 @@ impl P2PNode {
                                                 }
 
                                                 // Verify the proof
-                                                if let Err(e) = receipt.verify(FOOTSTEPS_GUEST_ID) {
+                                                if let Err(e) = receipt.verify(*ImageID) {
                                                     println!("Error verifying proof: {:?}", e);
 
                                                     // Mark as no longer processing
