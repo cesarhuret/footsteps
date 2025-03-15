@@ -1,0 +1,24 @@
+
+> playground@0.1.0 dev /home/cesar/footsteps/app
+> next dev "--port" "3000"
+
+   ▲ Next.js 15.2.2
+   - Local:        http://localhost:3000
+   - Network:      http://10.255.255.254:3000
+   - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 1173ms
+ ⚠ Your project has `@next/font` installed as a dependency, please use the built-in `next/font` instead. The `@next/font` package will be removed in Next.js 14. You can migrate by running `npx @next/codemod@latest built-in-next-font .`. Read more: https://nextjs.org/docs/messages/built-in-next-font
+ ○ Compiling / ...
+ ✓ Compiled / in 1834ms (1293 modules)
+[WebSocket] Initializing websocket module.
+ GET / 200 in 2179ms
+ ✓ Compiled in 147ms (601 modules)
+ ✓ Compiled /game in 466ms (1354 modules)
+ GET /game 200 in 587ms
+ ✓ Compiled /favicon.ico in 192ms (770 modules)
+ GET /favicon.ico 200 in 466ms
+ GET /favicon.ico 200 in 208ms
+ ELIFECYCLE  Command failed.
+[?25h
