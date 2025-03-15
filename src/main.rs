@@ -421,6 +421,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                             {
                                 let mut state = proof_game_state.lock().unwrap();
+                                state.processing = false;
                                 state.proof_status =
                                     format!("Proof generated in {:.2}s", elapsed.as_secs_f32());
                             }
