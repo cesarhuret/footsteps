@@ -8,28 +8,11 @@
    - Environments: .env
 
  ✓ Starting...
- ✓ Ready in 1119ms
+ ✓ Ready in 1228ms
  ⚠ Your project has `@next/font` installed as a dependency, please use the built-in `next/font` instead. The `@next/font` package will be removed in Next.js 14. You can migrate by running `npx @next/codemod@latest built-in-next-font .`. Read more: https://nextjs.org/docs/messages/built-in-next-font
  ○ Compiling / ...
- ✓ Compiled / in 1379ms (699 modules)
- GET / 200 in 1600ms
- ✓ Compiled in 390ms (325 modules)
- GET / 200 in 203ms
- ✓ Compiled /favicon.ico in 385ms (390 modules)
- GET /favicon.ico 200 in 660ms
- ○ Compiling /verify ...
- ✓ Compiled /verify in 1543ms (1296 modules)
-[WebSocket] Initializing websocket module.
- ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
- GET /verify 200 in 1795ms
- GET /favicon.ico 200 in 219ms
- GET / 200 in 32ms
- GET /favicon.ico 200 in 206ms
- ✓ Compiled in 252ms (600 modules)
- GET / 200 in 21ms
- ✓ Compiled in 3s (1310 modules)
- GET / 200 in 50ms
- ✓ Compiled in 178ms (1310 modules)
- GET / 200 in 42ms
+ ✓ Compiled / in 1099ms (699 modules)
+ GET / 200 in 1276ms
+ ✓ Compiled in 97ms (325 modules)
  ELIFECYCLE  Command failed.
 [?25h
