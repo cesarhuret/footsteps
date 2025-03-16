@@ -69,8 +69,13 @@ In each lobby, all players have the same verification requirements. New players 
 - Expand the game mechanics while maintaining the serverless architecture
 
 ## Getting Started
+Kinda complicated but
 
-(Instructions on how to set up and run the project)
+- install the submodules
+- build risc0
+- install the /app dependencies
+- build the rust server using
+  ```RISC0_PROVER=local RUSTFLAGS="-C target-cpu=native" cargo build --release --features cuda,prove```
 
 ## Requirements
 
