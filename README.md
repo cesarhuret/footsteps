@@ -1,50 +1,83 @@
-# Bevy Game Engine Example
+# Footsteps
 
-This code demonstrates a minimal example of how to use the [bevy] game engine inside the RISC Zero [zkVM].
+A serverless peer-to-peer multiplayer game using zero-knowledge proofs for decentralized gameplay verification.
 
-## Quick Start
+## Overview
 
-First, follow the [examples guide] to install dependencies and check out the correct version of the example.
+Footsteps is an innovative multiplayer game that eliminates the need for centralized game servers by leveraging ZK proofs shared across a peer-to-peer network. Players directly interact with each other while validating player moves according to the game logic without revealing their complete position.
 
-Then, run the example with:
+Every 5 seconds, the game generates and shares proofs of player movements, revealing only 50% of moves to other players. This creates an exciting gameplay dynamic where players have hints of others' locations without complete visibility.
 
-```bash
-cargo run --release
-```
+## Key Features
 
-## Use Cases
+- **Serverless Architecture**: No central server required to validate game logic or host lobbies
+- **Near Real-Time Multiplayer**: ~3 second delay for proof generation and verification
+- **Sybil Resistant**: Integrates Self Protocol for human verification to prevent bots
+- **Privacy-Preserving Gameplay**: Only reveals partial player movements (50%)
 
-By using this demo as part of a [Bonsai application], you could build an app where on-chain payment depends on off-chain gameplay.
-To learn more about this use case, check out our blog post about using Bonsai as a [zk coprocessor].
+## Technology Stack
 
-To link gameplay to a particular player, you may want to pair this demo with the [ECDSA] demo, which would allow a player to sign their moves.
+- **Risc0**: Zero-knowledge proof system for game logic verification
+- **libp2p**: Peer-to-peer networking for direct player connections
+- **Self Protocol**: Human verification system to ensure bot-free lobbies
+- **Rust**: Backend server handling p2p connections, WebSocket, and ZK proofs
+- **Next.js**: Frontend web application for game visuals
 
-## Project Organization
+## Architecture
 
-zkVM applications are organized into a [host program] and a [guest program].
-The host program can be found in [`src/main.rs`] and the guest program can be found in [`methods/guest/src/main.rs`].
+The game client for each player is divided into two parts:
 
-The [host] first [executes] the guest program and then [proves the execution] to construct a [receipt].
-The receipt can be passed to a third party, who can examine the [journal] to check the program's outputs and can [verify] the [receipt] to ensure the integrity of the [guest program]'s execution.
+1. **Rust Backend**:
+   - libp2p node for peer-to-peer connections
+   - WebSocket server for communication with frontend
+   - Risc0 prover and verifier for game logic
 
-## More Resources
+2. **Next.js Frontend**:
+   - Game visuals and controls
+   - Self Protocol backend verifier
+   - QR code display for verification
 
-For more information about building, running, and testing zkVM applications, see our [developer docs].
+## How It Works
 
-[`methods/guest/src/main.rs`]: methods/guest/src/main.rs
-[`src/main.rs`]: src/main.rs
-[bevy]: https://bevyengine.org/
-[Bonsai application]: https://dev.bonsai.xyz
-[developer docs]: https://dev.risczero.com/zkvm
-[ECDSA]: https://github.com/risc0/risc0/tree/main/examples/ecdsa
-[examples guide]: https://dev.risczero.com/api/zkvm/examples/#running-the-examples
-[executes]: https://dev.risczero.com/terminology#execute
-[guest program]: https://dev.risczero.com/terminology#guest-program
-[host]: https://dev.risczero.com/terminology#host
-[host program]: https://dev.risczero.com/terminology#host-program
-[journal]: https://dev.risczero.com/terminology#journal
-[proves the execution]: https://dev.risczero.com/terminology#prove
-[receipt]: https://dev.risczero.com/terminology#receipt
-[verify]: https://dev.risczero.com/terminology#verify
-[zk coprocessor]: https://www.risczero.com/blog/a-guide-to-zk-coprocessors-for-scalability
-[zkVM]: https://dev.risczero.com/zkvm
+1. Players connect to each other via libp2p
+2. Self Protocol verifier URLs are exchanged to prove human identity
+3. Players move freely in the game environment
+4. Every 5 seconds, ZK proofs of movements are generated
+5. Proofs are shared with and verified by other players
+6. Only 50% of movements are revealed to other players
+7. Invalid proofs trigger position rollbacks
+
+## Human Verification
+
+Self Protocol integration ensures that players:
+- Are verified humans
+- Are above 18 years of age
+- Are not on the OFAC list
+
+In each lobby, all players have the same verification requirements. New players must prove they meet the criteria before joining, and existing players verify newcomers are valid.
+
+## Unique Innovations
+
+- **Real-time ZK-Based Gameplay**: Unlike turn-based ZK games, Footsteps implements near real-time gameplay with 5-second proof batching
+- **Decentralized Player Verification**: Sybil resistance through ZK proofs of identity
+- **Privacy-Preserving Movement System**: Partial information revelation creates unique gameplay dynamics
+
+## Future Development
+
+- Implement shooting/flashlight mechanics where players can request proofs to determine if other players were within a flashlight's path
+- Further optimize proof generation and verification time
+- Expand the game mechanics while maintaining the serverless architecture
+
+## Getting Started
+
+(Instructions on how to set up and run the project)
+
+## Requirements
+
+- Rust
+- Node.js
+- Self Protocol account for verification
+
+## License
+
+(Your license information)
