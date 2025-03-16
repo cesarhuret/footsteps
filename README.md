@@ -1,3 +1,4 @@
+![pixil-frame-0 (2)](https://github.com/user-attachments/assets/62ebd306-8d52-4d97-9c6d-6e498a032862)
 # Footsteps
 
 A serverless peer-to-peer multiplayer game using zero-knowledge proofs for decentralized gameplay verification.
@@ -7,6 +8,8 @@ A serverless peer-to-peer multiplayer game using zero-knowledge proofs for decen
 Footsteps is an innovative multiplayer game that eliminates the need for centralized game servers by leveraging ZK proofs shared across a peer-to-peer network. Players directly interact with each other while validating player moves according to the game logic without revealing their complete position.
 
 Every 5 seconds, the game generates and shares proofs of player movements, revealing only 50% of moves to other players. This creates an exciting gameplay dynamic where players have hints of others' locations without complete visibility.
+
+![Screenshot 2025-03-15 122825](https://github.com/user-attachments/assets/843de1f9-1334-43ba-ae60-e8df58cdb0d7)
 
 ## Key Features
 
@@ -48,6 +51,7 @@ The game client for each player is divided into two parts:
 7. Invalid proofs trigger position rollbacks
 
 ## Human Verification
+![Screenshot 2025-03-15 122918](https://github.com/user-attachments/assets/4b7e84e3-8426-43c6-a6e6-fb1a9191b664)
 
 Self Protocol integration ensures that players:
 - Are verified humans
