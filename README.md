@@ -75,7 +75,19 @@ Kinda complicated but
 - build risc0
 - install the /app dependencies
 - build the rust server using
+  
   ```RISC0_PROVER=local RUSTFLAGS="-C target-cpu=native" cargo build --release --features cuda,prove```
+
+- run the demo script using
+
+  ```
+  # first client 
+  ./run_demo.sh desktop 3003 3004 9001 
+  # second client
+  ./run_demo.sh laptop 3002 3001 9000 <first_client_ip>:9001
+  ```
+  ![image](https://github.com/user-attachments/assets/f0584cbb-6475-4fb6-a171-10aeb6057d35)
+
 
 ## Requirements
 
