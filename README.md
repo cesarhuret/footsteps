@@ -77,7 +77,3 @@ In each lobby, all players have the same verification requirements. New players 
 - Rust
 - Node.js
 - Self Protocol account for verification
-
-## License
-
-(Your license information)
